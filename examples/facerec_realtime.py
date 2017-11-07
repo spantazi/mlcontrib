@@ -46,7 +46,7 @@ def find_matching_id(id_dataset, embedding):
             matching_id = id_data.name
     return matching_id, min_dist
 
-def processFrame(self, imgdata, identity):
+def processFrame(self, sess, imgdata, identity):
         imgF = StringIO.StringIO()
         imgF.write(imgdata)
         imgF.seek(0)
@@ -182,7 +182,7 @@ def main(args):
                 start = time.time()
                 _, frame = cap.read()
 
-                processFrame(self, frame, None)
+                processFrame(self, sess, frame, None)
                 end = time.time()
 
                 seconds = end - start
