@@ -1,12 +1,12 @@
-import tensorflow as tf
-import numpy as np
 import sys
 import os
-import detect_and_align
 import re
 import cv2
 import argparse
 import time
+import detect_and_align
+import tensorflow as tf
+import numpy as np
 from scipy import misc
 from sklearn.decomposition import PCA
 from sklearn.grid_search import GridSearchCV
@@ -48,7 +48,7 @@ def find_matching_id(id_dataset, embedding):
             matching_id = id_data.name
     return matching_id, min_dist
 
-def processFrame(sess, imgdata, identity):
+def processFrame(sess, imgdata, embeddings, identity):
         imgF = StringIO.StringIO()
         imgF.write(imgdata)
         imgF.seek(0)
@@ -134,6 +134,8 @@ def processFrame(sess, imgdata, identity):
             imgdata = StringIO.StringIO()
             plt.savefig(imgdata, format='png')
             plt.close()
+        
+        return name, annotatedFrame
 
 def load_model(model):
     model_exp = os.path.expanduser(model)
@@ -153,7 +155,7 @@ def load_model(model):
         saver = tf.train.import_meta_graph(os.path.join(model_exp, meta_file))
         saver.restore(tf.get_default_session(), os.path.join(model_exp, ckpt_file))
 
-def main(args):
+def main(argv):
     modelDir = os.path.join(fileDir, '..', '..', 'models')
 
     parser = argparse.ArgumentParser()
@@ -161,15 +163,17 @@ def main(args):
                         default=os.path.join('./models/facenet-1/20170511-185253/', '20170511-185253.pb'))
     parser.add_argument('--imgDim', type=int,
                         help="Default image dimension.", default=96)
+    parser.add_argument('--identity', type=str, help="Identity of the person",
+                        default='Unknown')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     with tf.Graph().as_default():
         with tf.Session() as sess:
 
-            pnet, rnet, onet = detect_and_align.create_mtcnn(sess, None)
-
+            pnet, rnet, onet = detect_and_align.create_mtcnn(sess, args.identity)
             load_model(args.model)
+
             images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
             embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
             phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
@@ -185,17 +189,10 @@ def main(args):
                 start = time.time()
                 _, frame = cap.read()
 
-                processFrame(sess, frame, None)
-                end = time.time()
-
-                seconds = end - start
-                fps = round(1 / seconds, 2)
-
-                if show_fps:
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    cv2.putText(frame, str(fps), (0, int(frame_height) - 5), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
-
-                cv2.imshow('frame', frame)
+                matching_id, annotatedFrame = processFrame(sess, frame, embeddings, None)
+                
+                if matching_id:
+                    cv2.imshow('frame', annotatedFrame)
 
                 key = cv2.waitKey(1)
                 if key == ord('q'):
