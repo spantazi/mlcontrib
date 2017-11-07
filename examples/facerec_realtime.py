@@ -25,6 +25,14 @@ class Face:
             self.rep[0:5]
         )
 
+def __init__(self):
+    self.images = {}
+    self.training = True
+    self.people = []
+    self.svm = None
+    if args.unknown:
+        self.unknownImgs = np.load("./examples/web/unknown.npy")
+
 def find_matching_id(id_dataset, embedding):
     threshold = 1.1
     min_dist = 10.0
@@ -125,7 +133,34 @@ def processFrame(self, imgdata, identity):
             plt.savefig(imgdata, format='png')
             plt.close()
 
+def load_model(model):
+    model_exp = os.path.expanduser(model)
+    if (os.path.isfile(model_exp)):
+        print('Model filename: %s' % model_exp)
+        with gfile.FastGFile(model_exp, 'rb') as f:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString(f.read())
+            tf.import_graph_def(graph_def, name='')
+    else:
+        print('Model directory: %s' % model_exp)
+        meta_file, ckpt_file = get_model_filenames(model_exp)
+
+        print('Metagraph file: %s' % meta_file)
+        print('Checkpoint file: %s' % ckpt_file)
+
+        saver = tf.train.import_meta_graph(os.path.join(model_exp, meta_file))
+        saver.restore(tf.get_default_session(), os.path.join(model_exp, ckpt_file))
+
 def main(args):
+    modelDir = os.path.join(fileDir, '..', '..', 'models')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, help="Path to Facenet pre-trained network model.",
+                        default=os.path.join('./models/facenet-1/20170511-185253/', '20170511-185253.pb'))
+    parser.add_argument('--imgDim', type=int,
+                        help="Default image dimension.", default=96)
+
+    args = parser.parse_args()
     with tf.Graph().as_default():
         with tf.Session() as sess:
 
@@ -135,11 +170,6 @@ def main(args):
             images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
             embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
             phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
-
-            id_dataset = id_data.get_id_data(args.id_folder[0], pnet, rnet, onet, sess, embeddings, images_placeholder, phase_train_placeholder)
-            print_id_dataset_table(id_dataset)
-
-            test_run(pnet, rnet, onet, sess, images_placeholder, phase_train_placeholder, embeddings, id_dataset, args.test_folder)
 
             cap = cv2.VideoCapture(0)
             frame_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -152,40 +182,7 @@ def main(args):
                 start = time.time()
                 _, frame = cap.read()
 
-                face_patches, padded_bounding_boxes, landmarks = detect_and_align.align_image(frame, pnet, rnet, onet)
-
-                if len(face_patches) > 0:
-                    face_patches = np.stack(face_patches)
-                    feed_dict = {images_placeholder: face_patches, phase_train_placeholder: False}
-                    embs = sess.run(embeddings, feed_dict=feed_dict)
-
-                    print('Matches in frame:')
-                    for i in range(len(embs)):
-                        bb = padded_bounding_boxes[i]
-
-                        matching_id, dist = find_matching_id(id_dataset, embs[i, :])
-                        if matching_id:
-                            print('Hi %s! Distance: %1.4f' % (matching_id, dist))
-                        else:
-                            matching_id = 'Unkown'
-                            print('Unkown! Couldn\'t fint match.')
-
-                        if show_id:
-                            font = cv2.FONT_HERSHEY_SIMPLEX
-                            cv2.putText(frame, matching_id, (bb[0], bb[3]), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
-
-                        if show_bb:
-                            cv2.rectangle(frame, (bb[0], bb[1]), (bb[2], bb[3]), (255, 0, 0), 2)
-
-                        if show_landmarks:
-                            for j in range(5):
-                                size = 1
-                                top_left = (int(landmarks[i, j]) - size, int(landmarks[i, j + 5]) - size)
-                                bottom_right = (int(landmarks[i, j]) + size, int(landmarks[i, j + 5]) + size)
-                                cv2.rectangle(frame, top_left, bottom_right, (255, 0, 255), 2)
-                else:
-                    print('Couldn\'t find a face')
-
+                processFrame(self, frame, None)
                 end = time.time()
 
                 seconds = end - start
