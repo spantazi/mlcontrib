@@ -13,6 +13,16 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.manifold import TSNE
 from sklearn.svm import SVC
 
+
+images = {}
+training = True
+people = []
+svm = None
+pnet = None
+rnet = None
+onet = None
+unknownImgs = np.load("./examples/web/unknown.npy")
+
 class Face:
 
     def __init__(self, rep, identity):
@@ -24,14 +34,6 @@ class Face:
             str(self.identity),
             self.rep[0:5]
         )
-
-def __init__(self):
-    self.images = {}
-    self.training = True
-    self.people = []
-    self.svm = None
-    if args.unknown:
-        self.unknownImgs = np.load("./examples/web/unknown.npy")
 
 def find_matching_id(id_dataset, embedding):
     threshold = 1.1
@@ -46,7 +48,7 @@ def find_matching_id(id_dataset, embedding):
             matching_id = id_data.name
     return matching_id, min_dist
 
-def processFrame(self, sess, imgdata, identity):
+def processFrame(sess, imgdata, identity):
         imgF = StringIO.StringIO()
         imgF.write(imgdata)
         imgF.seek(0)
@@ -58,7 +60,7 @@ def processFrame(self, sess, imgdata, identity):
         rgbFrame[:, :, 1] = buf[:, :, 1]
         rgbFrame[:, :, 2] = buf[:, :, 0]
 
-        if not self.training:
+        if not training:
             annotatedFrame = np.copy(buf)
 
         # cv2.imshow('frame', rgbFrame)
@@ -81,31 +83,31 @@ def processFrame(self, sess, imgdata, identity):
                 bb = bbs[i]
                 alignedFace = face_patches[i]
                 phash = str(imagehash.phash(Image.fromarray(alignedFace)))
-                if phash in self.images:
-                    identity = self.images[phash].identity
+                if phash in images:
+                    identity = images[phash].identity
                 else:
                     rep = embs[i, :]
                     # print(rep)
-                    if self.training:
-                        self.images[phash] = Face(rep, identity)
+                    if training:
+                        images[phash] = Face(rep, identity)
                         # TODO: Transferring as a string is suboptimal.
                         # content = [str(x) for x in cv2.resize(alignedFace, (0,0),
                         # fx=0.5, fy=0.5).flatten()]
                         content = [str(x) for x in alignedFace.flatten()]
                     else:
-                        if len(self.people) == 0:
+                        if len(people) == 0:
                             identity = -1
-                        elif len(self.people) == 1:
+                        elif len(people) == 1:
                             identity = 0
-                        elif self.svm:
-                            identity = self.svm.predict(rep)[0]
+                        elif svm:
+                            identity = svm.predict(rep)[0]
                         else:
                             print("hhh")
                             identity = -1
                         if identity not in identities:
                             identities.append(identity)
 
-                if not self.training:
+                if not training:
                     bl = (bb.left(), bb.bottom())
                     tr = (bb.right(), bb.top())
                     cv2.rectangle(annotatedFrame, bl, tr, color=(153, 255, 204),
@@ -114,17 +116,17 @@ def processFrame(self, sess, imgdata, identity):
                         cv2.circle(annotatedFrame, center=landmarks[p], radius=3,
                                    color=(102, 204, 255), thickness=-1)
                     if identity == -1:
-                        if len(self.people) == 1:
-                            name = self.people[0]
+                        if len(people) == 1:
+                            name = people[0]
                         else:
                             name = "Unknown"
                     else:
-                        name = self.people[identity]
+                        name = people[identity]
                     cv2.putText(annotatedFrame, name, (bb.left(), bb.top() - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75,
                                 color=(152, 255, 204), thickness=2)
 
-        if not self.training:
+        if not training:
             plt.figure()
             plt.imshow(annotatedFrame)
             plt.xticks([])
@@ -161,7 +163,6 @@ def main(args):
                         help="Default image dimension.", default=96)
 
     args = parser.parse_args()
-    __init__(self)
 
     with tf.Graph().as_default():
         with tf.Session() as sess:
@@ -184,7 +185,7 @@ def main(args):
                 start = time.time()
                 _, frame = cap.read()
 
-                processFrame(self, sess, frame, None)
+                processFrame(sess, frame, None)
                 end = time.time()
 
                 seconds = end - start
