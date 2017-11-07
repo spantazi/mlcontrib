@@ -161,6 +161,8 @@ def main(args):
                         help="Default image dimension.", default=96)
 
     args = parser.parse_args()
+    __init__(self)
+
     with tf.Graph().as_default():
         with tf.Session() as sess:
 
